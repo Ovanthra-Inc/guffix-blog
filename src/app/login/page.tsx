@@ -21,8 +21,10 @@ export default function LoginPage() {
       const user = await signInWithGoogle();
       toast.success("Signed in successfully!");
       
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "sidhyaasutosh@gmail.com";
+      
       // Initial redirect logic - role sync happens in AuthProvider
-      if (user?.email === "sidhyaasutosh@gmail.com") {
+      if (user?.email === adminEmail) {
         router.push("/admin");
       } else {
         router.push("/");
@@ -42,11 +44,14 @@ export default function LoginPage() {
       const user = await signInWithEmail(email, password);
       toast.success("Signed in successfully!");
       
-      if (user?.email === "sidhyaasutosh@gmail.com") {
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "sidhyaasutosh@gmail.com";
+      
+      if (user?.email === adminEmail) {
         router.push("/admin");
       } else {
         router.push("/");
       }
+
 
 
     } catch {

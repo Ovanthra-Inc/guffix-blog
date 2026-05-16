@@ -6,9 +6,10 @@ import type { UserProfile } from "@/types/user";
 export async function syncUserProfile(uid: string, data: { email: string; displayName?: string; photoURL?: string }): Promise<UserProfile> {
   let profile = await getUserProfile(uid);
   
-  const ADMIN_EMAIL = "sidhyaasutosh@gmail.com";
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sidhyaasutosh@gmail.com";
 
   if (!profile) {
+
     const role = data.email === ADMIN_EMAIL ? "admin" : "user";
     await createOrUpdateUserProfile(uid, {
       ...data,

@@ -104,11 +104,19 @@ export async function publishPost(id: string): Promise<void> {
 }
 
 export async function incrementViewCount(id: string): Promise<void> {
-  await db
-    .collection("posts")
-    .doc(id)
-    .update({ viewCount: FieldValue.increment(1) });
+  const batch = db.batch();
+  
+  // Increment individual post view count
+  const postRef = db.collection("posts").doc(id);
+  batch.update(postRef, { viewCount: FieldValue.increment(1) });
+  
+  // Increment global total views
+  const statsRef = db.collection("stats").doc("overview");
+  batch.set(statsRef, { totalViews: FieldValue.increment(1) }, { merge: true });
+  
+  await batch.commit();
 }
+
 
 // ─── TOPICS ──────────────────────────────────────────────
 
@@ -237,6 +245,22 @@ export async function getNewsletterSubscriberCount(): Promise<number> {
   return snapshot.data().count;
 }
 
+export async function unsubscribeNewsletter(email: string): Promise<void> {
+  const snapshot = await db
+    .collection("newsletter_subscribers")
+    .where("email", "==", email)
+    .get();
+  
+  if (snapshot.empty) return;
+  
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.update(doc.ref, { isActive: false, unsubscribedAt: FieldValue.serverTimestamp() });
+  });
+  await batch.commit();
+}
+
+
 // ─── ANALYTICS ────────────────────────────────────────────
 
 export async function getDashboardStats() {
@@ -272,9 +296,9 @@ export async function getDashboardStats() {
         )
       : 0;
 
-  // Real View Count
-  const allPublishedPosts = await db.collection("posts").where("status", "==", "published").select("viewCount").get();
-  const totalViews = allPublishedPosts.docs.reduce((sum, doc) => sum + (doc.data().viewCount || 0), 0);
+  // Real View Count (Optimized: Fetch from aggregate doc)
+  const statsDoc = await db.collection("stats").doc("overview").get();
+  const totalViews = statsDoc.exists ? statsDoc.data()?.totalViews || 0 : 0;
 
   return {
     totalPosts: totalPosts.data().count,
@@ -287,6 +311,7 @@ export async function getDashboardStats() {
     monthlyViews: totalViews,
   };
 }
+
 
 
 // ─── SCHEDULED POSTS ─────────────────────────────────────

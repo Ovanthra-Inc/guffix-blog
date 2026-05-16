@@ -69,9 +69,47 @@ export default async function BlogDetailPage({ params }: BlogDetailPageProps) {
 
   const faqSections = post.sections.filter((s) => s.type === "faq");
 
+  // Paywall SEO Structured Data
+  const paywallSchema = post.isPremium ? {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": `${process.env.NEXT_PUBLIC_SITE_URL}/blog/${post.slug}`
+    },
+    "headline": post.title,
+    "description": post.excerpt,
+    "image": post.heroImage?.url,
+    "author": {
+      "@type": "Person",
+      "name": post.authorName || "GuffixAI"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "GuffixAI",
+      "logo": {
+        "@type": "ImageObject",
+        "url": `${process.env.NEXT_PUBLIC_SITE_URL}/logo.png`
+      }
+    },
+    "isAccessibleForFree": "False",
+    "hasPart": {
+      "@type": "WebPageElement",
+      "isAccessibleForFree": "False",
+      "cssSelector": ".premium-content"
+    }
+  } : null;
+
   return (
     <>
+      {paywallSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(paywallSchema) }}
+        />
+      )}
       <Header />
+
       <main className="flex-1">
         <article className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="max-w-4xl mx-auto">
@@ -151,8 +189,9 @@ export default async function BlogDetailPage({ params }: BlogDetailPageProps) {
               )}
 
               {isLocked ? (
-                <div className="relative">
+                <div className="relative premium-content">
                   <div className="opacity-[0.15] blur-xl select-none pointer-events-none">
+
                     <BlogContentRenderer sections={post.sections.slice(0, 2)} />
                   </div>
                   <PremiumLock />

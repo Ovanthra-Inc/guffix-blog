@@ -19,3 +19,20 @@ export async function getServerUserTier(): Promise<UserTier> {
     return "free";
   }
 }
+
+export async function getServerUserProfile() {
+  const cookieStore = await cookies();
+  const session = cookieStore.get("session")?.value;
+
+  if (!session) return null;
+
+  try {
+    const decoded = await auth.verifySessionCookie(session);
+    if (!decoded) return null;
+
+    return await getUserProfile(decoded.uid);
+  } catch {
+    return null;
+  }
+}
+

@@ -9,7 +9,7 @@ import { generateAndUploadImage } from "./image-generator";
 import type { BlogPost, BlogSection } from "@/types/blog";
 
 const BlogSectionSchema = z.object({
-  id: z.string(),
+  id: z.string().regex(/^[a-z0-9-]+$/, "Must be a URL-safe slug (lowercase, numbers, and hyphens only)"),
   type: z.enum([
     "heading",
     "paragraph",
@@ -55,6 +55,7 @@ const BlogGenerationSchema = z.object({
   ),
   seoScore: z.number().min(0).max(100),
   readabilityScore: z.number().min(0).max(100),
+  usedAffiliateLinkIds: z.array(z.string()).describe("IDs of the affiliate links actually woven into the content"),
   affiliateSuggestions: z.array(
     z.object({
       category: z.string(),
@@ -63,6 +64,7 @@ const BlogGenerationSchema = z.object({
     })
   ),
 });
+
 
 export async function generateBlog(
   topic: string,
@@ -104,10 +106,10 @@ export async function generateBlog(
   // 3. Generate Hero Image in background (parallel-ish)
   const heroImageUrl = await generateAndUploadImage(data.heroImagePrompt, slug);
 
-  // Ensure each section has a unique ID
+  // Ensure each section has a unique ID (and slugify fallback)
   const sections: BlogSection[] = data.sections.map((s, i) => ({
     ...s,
-    id: s.id || `section-${i + 1}`,
+    id: s.id ? slugify(s.id) : `section-${i + 1}`,
   }));
 
   const rt = readingTime(sections);
@@ -129,7 +131,7 @@ export async function generateBlog(
     sections,
     faq: data.faq,
     sources: [],
-    affiliateLinks: availableLinks.map(l => l.id!),
+    affiliateLinks: data.usedAffiliateLinkIds || [],
     seoScore: data.seoScore,
     readabilityScore: data.readabilityScore,
     readingTime: rt,
@@ -138,6 +140,7 @@ export async function generateBlog(
     scheduledAt: null,
   };
 }
+
 
 
 export async function regenerateSection(
