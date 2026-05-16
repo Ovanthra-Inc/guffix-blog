@@ -4,6 +4,8 @@ import { openrouter, DEFAULT_MODEL } from "./openrouter";
 import { BLOG_GENERATION_PROMPT } from "./prompts";
 import { slugify } from "@/lib/utils/slugify";
 import { readingTime } from "@/lib/utils/reading-time";
+import { getAffiliateLinks } from "@/lib/firebase/firestore";
+import { generateAndUploadImage } from "./image-generator";
 import type { BlogPost, BlogSection } from "@/types/blog";
 
 const BlogSectionSchema = z.object({
@@ -67,14 +69,40 @@ export async function generateBlog(
   category: string,
   keywords: string[] = []
 ): Promise<Omit<BlogPost, "id" | "status" | "createdAt" | "updatedAt">> {
+  // 1. Fetch real affiliate links to inject into the prompt
+  const availableLinks = await getAffiliateLinks();
+  const linksContext = availableLinks
+    .map((l) => `- ${l.name} (${l.category}): ${l.url} - ${l.description}`)
+    .join("\n");
+
+  // 2. Fetch previous posts for internal linking
+  const { posts: recentPosts } = await getPosts({ status: "published", limit: 10 });
+  const internalLinksContext = recentPosts
+    .map((p) => `- "${p.title}": ${process.env.NEXT_PUBLIC_SITE_URL}/blog/${p.slug}`)
+    .join("\n");
+
+  // 3. Generate blog content
   const result = await generateObject({
     model: openrouter(DEFAULT_MODEL),
     schema: BlogGenerationSchema,
-    prompt: BLOG_GENERATION_PROMPT(topic, category, keywords),
+    prompt: `
+      ${BLOG_GENERATION_PROMPT(topic, category, keywords)}
+      
+      REAL AFFILIATE LINKS AVAILABLE (Integrate these naturally):
+      ${linksContext || "None available."}
+
+      INTERNAL POSTS TO LINK TO (Link to these naturally if relevant):
+      ${internalLinksContext || "No previous posts available."}
+    `,
     temperature: 0.7,
   });
 
+
   const data = result.object;
+  const slug = data.slug || slugify(data.title);
+
+  // 3. Generate Hero Image in background (parallel-ish)
+  const heroImageUrl = await generateAndUploadImage(data.heroImagePrompt, slug);
 
   // Ensure each section has a unique ID
   const sections: BlogSection[] = data.sections.map((s, i) => ({
@@ -86,7 +114,7 @@ export async function generateBlog(
 
   return {
     title: data.title,
-    slug: data.slug || slugify(data.title),
+    slug,
     excerpt: data.excerpt,
     metaTitle: data.metaTitle,
     metaDescription: data.metaDescription,
@@ -94,14 +122,14 @@ export async function generateBlog(
     category,
     tags: data.tags,
     heroImage: {
-      url: "",
+      url: heroImageUrl,
       prompt: data.heroImagePrompt,
       alt: data.title,
     },
     sections,
     faq: data.faq,
     sources: [],
-    affiliateLinks: [],
+    affiliateLinks: availableLinks.map(l => l.id!),
     seoScore: data.seoScore,
     readabilityScore: data.readabilityScore,
     readingTime: rt,
@@ -110,6 +138,7 @@ export async function generateBlog(
     scheduledAt: null,
   };
 }
+
 
 export async function regenerateSection(
   sectionType: string,

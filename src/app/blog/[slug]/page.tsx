@@ -4,7 +4,9 @@ import { generateSeoMetadata } from "@/lib/utils/seo";
 import { BlogContentRenderer } from "@/components/blog/blog-content-renderer";
 import { TableOfContents } from "@/components/blog/table-of-contents";
 import { AuthorCard } from "@/components/blog/author-card";
+import { BlogCard } from "@/components/blog/blog-card";
 import { Header } from "@/components/layout/header";
+
 import { Footer } from "@/components/layout/footer";
 import { formatDistanceToNow } from "date-fns";
 import { Clock, Eye, Tag, TrendingUp } from "lucide-react";
@@ -13,7 +15,9 @@ import type { Metadata } from "next";
 import { getServerUserTier } from "@/lib/firebase/server-auth";
 import { PremiumLock } from "@/components/blog/premium-lock";
 import { SeriesNavigator } from "@/components/blog/series-navigator";
-import { getSeriesById, getPostsByIds } from "@/lib/firebase/firestore";
+import { SocialShareButtons } from "@/components/blog/social-share-buttons";
+import { getSeriesById, getPostsByIds, getPosts } from "@/lib/firebase/firestore";
+
 
 interface BlogDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -130,9 +134,18 @@ export default async function BlogDetailPage({ params }: BlogDetailPageProps) {
           </div>
 
           {/* Content layout */}
-          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-10">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[60px_1fr_260px] gap-8 xl:gap-16">
+            {/* Left: Social Share */}
+            <div className="hidden lg:block">
+              <SocialShareButtons
+                title={post.title}
+                url={`${process.env.NEXT_PUBLIC_SITE_URL}/blog/${post.slug}`}
+              />
+            </div>
+
             {/* Main content */}
-            <div className="max-w-3xl">
+            <div className="max-w-3xl mx-auto lg:mx-0">
+
               {series && (
                 <SeriesNavigator post={post} series={series} allPosts={seriesPosts} />
               )}
@@ -184,6 +197,9 @@ export default async function BlogDetailPage({ params }: BlogDetailPageProps) {
                 bio={post.authorBio}
                 avatar={post.authorAvatar}
               />
+
+              {/* Related Posts */}
+              <RelatedPosts category={post.category} currentPostId={post.id} />
             </div>
 
             {/* Sidebar TOC */}
@@ -197,3 +213,29 @@ export default async function BlogDetailPage({ params }: BlogDetailPageProps) {
     </>
   );
 }
+
+async function RelatedPosts({ category, currentPostId }: { category: string; currentPostId: string }) {
+  try {
+    const { posts } = await getPosts({ status: "published", category, limit: 4 });
+    const filtered = posts.filter((p) => p.id !== currentPostId).slice(0, 3);
+
+    if (filtered.length === 0) return null;
+
+    return (
+      <div className="mt-20 pt-12 border-t border-border/50">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-2xl font-black">Related <span className="text-gradient">Articles</span></h2>
+          <a href={`/blog?category=${category}`} className="text-sm font-bold text-primary hover:underline">View all</a>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map((post) => (
+            <BlogCard key={post.id} post={post} />
+          ))}
+        </div>
+      </div>
+    );
+  } catch {
+    return null;
+  }
+}
+

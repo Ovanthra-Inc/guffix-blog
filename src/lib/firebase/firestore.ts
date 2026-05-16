@@ -12,7 +12,8 @@ export async function getPosts(options?: {
   status?: BlogStatus;
   category?: string;
   limit?: number;
-}): Promise<BlogPost[]> {
+  lastDocId?: string;
+}): Promise<{ posts: BlogPost[]; lastDocId: string | null }> {
   let query = db.collection("posts").orderBy("createdAt", "desc") as FirebaseFirestore.Query;
 
   if (options?.status) {
@@ -21,16 +22,28 @@ export async function getPosts(options?: {
   if (options?.category) {
     query = query.where("category", "==", options.category);
   }
+  if (options?.lastDocId) {
+    const lastDoc = await db.collection("posts").doc(options.lastDocId).get();
+    if (lastDoc.exists) {
+      query = query.startAfter(lastDoc);
+    }
+  }
   if (options?.limit) {
     query = query.limit(options.limit);
   }
 
   const snapshot = await query.get();
-  return snapshot.docs.map((doc) => ({
+  const posts = snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   })) as BlogPost[];
+
+  return {
+    posts,
+    lastDocId: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1].id : null,
+  };
 }
+
 
 export async function getPostById(id: string): Promise<BlogPost | null> {
   const doc = await db.collection("posts").doc(id).get();
@@ -249,7 +262,8 @@ export async function getDashboardStats() {
   );
 
   // Average SEO score
-  const recentPosts = await getPosts({ status: "published", limit: 20 });
+  const { posts: recentPosts } = await getPosts({ status: "published", limit: 20 });
+
   const avgSeoScore =
     recentPosts.length > 0
       ? Math.round(
@@ -257,6 +271,10 @@ export async function getDashboardStats() {
             recentPosts.length
         )
       : 0;
+
+  // Real View Count
+  const allPublishedPosts = await db.collection("posts").where("status", "==", "published").select("viewCount").get();
+  const totalViews = allPublishedPosts.docs.reduce((sum, doc) => sum + (doc.data().viewCount || 0), 0);
 
   return {
     totalPosts: totalPosts.data().count,
@@ -266,9 +284,10 @@ export async function getDashboardStats() {
     newsletterSubscribers: subscriberCount,
     affiliateClicks: totalAffiliateClicks,
     avgSeoScore,
-    monthlyViews: 0, // Integrate with analytics service for real data
+    monthlyViews: totalViews,
   };
 }
+
 
 // ─── SCHEDULED POSTS ─────────────────────────────────────
 
@@ -304,6 +323,18 @@ export async function updateSettings(data: Record<string, unknown>): Promise<voi
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const doc = await db.collection("users").doc(uid).get();
   if (!doc.exists) return null;
+  return { uid: doc.id, ...doc.data() } as UserProfile;
+}
+export async function getUserByStripeCustomerId(
+  customerId: string
+): Promise<UserProfile | null> {
+  const snapshot = await db
+    .collection("users")
+    .where("stripeCustomerId", "==", customerId)
+    .limit(1)
+    .get();
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
   return { uid: doc.id, ...doc.data() } as UserProfile;
 }
 

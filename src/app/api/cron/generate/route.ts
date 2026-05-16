@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTopics, updateTopic } from "@/lib/firebase/firestore";
 import { generateAndSavePostAction } from "@/lib/actions/post.actions";
 
+// Increase timeout for long-running AI generation (Vercel Pro only)
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
+
 export async function GET(req: NextRequest) {
   // Verify cron secret
   const authHeader = req.headers.get("authorization");

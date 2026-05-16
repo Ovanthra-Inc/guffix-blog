@@ -1,5 +1,7 @@
 let adminDb: any = null;
 let adminAuth: any = null;
+let adminStorage: any = null;
+
 
 // Only initialize if credentials are available
 const hasAdminCredentials = !!(
@@ -12,6 +14,7 @@ if (hasAdminCredentials) {
   try {
     const { cert, getApps, initializeApp } = require("firebase-admin/app");
     const { getFirestore } = require("firebase-admin/firestore");
+    const { getStorage } = require("firebase-admin/storage");
     const { getAuth } = require("firebase-admin/auth");
 
     if (getApps().length === 0) {
@@ -21,11 +24,14 @@ if (hasAdminCredentials) {
           clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
           privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n"),
         }),
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
       });
     }
 
     adminDb = getFirestore();
     adminAuth = getAuth();
+    adminStorage = getStorage();
+
   } catch (e) {
     console.warn("[Firebase Admin] Initialization failed:", e);
   }
@@ -38,4 +44,6 @@ if (hasAdminCredentials) {
 
 export const db = adminDb;
 export const auth = adminAuth;
+export const storage = adminStorage;
 export const isAdminConfigured = hasAdminCredentials && !!adminDb;
+

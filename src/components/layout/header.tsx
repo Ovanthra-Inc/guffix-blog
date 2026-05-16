@@ -18,7 +18,8 @@ const navLinks = [
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
+  const isAdmin = userProfile?.role === "admin";
 
 
   return (
@@ -69,10 +70,10 @@ export function Header() {
               Subscribe
             </Link>
             <Link
-              href={user?.email === "sidhyaasutosh@gmail.com" ? "/admin" : "/login"}
+              href={isAdmin ? "/admin" : "/login"}
               className="hidden sm:flex px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
             >
-              {user?.email === "sidhyaasutosh@gmail.com" ? "Admin" : "Login"}
+              {isAdmin ? "Admin" : "Login"}
             </Link>
 
 
@@ -105,12 +106,13 @@ export function Header() {
               </Link>
             ))}
             <Link
-              href={user?.email === "sidhyaasutosh@gmail.com" ? "/admin" : "/login"}
+              href={isAdmin ? "/admin" : "/login"}
               onClick={() => setMobileOpen(false)}
               className="flex items-center px-3 py-2.5 mt-1 rounded-md text-sm font-bold text-primary bg-primary/10"
             >
-              {user?.email === "sidhyaasutosh@gmail.com" ? "Admin Dashboard" : "Login"}
+              {isAdmin ? "Admin Dashboard" : "Login"}
             </Link>
+
 
           </div>
         )}

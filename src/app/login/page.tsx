@@ -20,6 +20,8 @@ export default function LoginPage() {
     try {
       const user = await signInWithGoogle();
       toast.success("Signed in successfully!");
+      
+      // Initial redirect logic - role sync happens in AuthProvider
       if (user?.email === "sidhyaasutosh@gmail.com") {
         router.push("/admin");
       } else {
@@ -39,11 +41,13 @@ export default function LoginPage() {
     try {
       const user = await signInWithEmail(email, password);
       toast.success("Signed in successfully!");
+      
       if (user?.email === "sidhyaasutosh@gmail.com") {
         router.push("/admin");
       } else {
         router.push("/");
       }
+
 
     } catch {
       toast.error("Invalid email or password.");
